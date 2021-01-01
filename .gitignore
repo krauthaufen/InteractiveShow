@@ -1,1 +1,8 @@
 /Aardvark.log
+/.vs
+bin/
+obj/
+paket-files/
+/packages/
+/.paket
+/.fake
