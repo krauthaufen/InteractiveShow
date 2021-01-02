@@ -1,14 +1,17 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
     <LangVersion>5.0</LangVersion>
     <DisableImplictiFSharpCoreReference>true</DisableImplictiFSharpCoreReference>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Library.fs" />
-    <Compile Include="Model.fs" />
-    <Compile Include="SceneApp.fs" />
+    <None Include="paket.references" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Aardvark.DotNet.Interactive\Aardvark.DotNet.Interactive.fsproj" />
   </ItemGroup>
   <Import Project="..\.paket\Paket.Restore.targets" />
 </Project>

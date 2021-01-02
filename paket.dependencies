@@ -1,4 +1,4 @@
-framework: netstandard2.1
+framework: netstandard2.1, netcoreapp3.1
 source https://api.nuget.org/v3/index.json
 storage: none
 
@@ -34,7 +34,7 @@ nuget Microsoft.DotNet.Interactive      ~> 1.0.0-beta.20553.2
 nuget System.Text.Json                  ~> 5.0.0
 nuget Suave                             ~> 2.5.5
 
-
+nuget Aardium                           ~> 1.1.0
 group Build
     framework: netstandard2.0
     source https://api.nuget.org/v3/index.json

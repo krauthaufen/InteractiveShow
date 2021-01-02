@@ -11,7 +11,7 @@ open Aardvark.Base.Rendering
 
 
 [<AutoOpen>]
-module rec Show =
+module Show =
 
     open FSharp.Data.Adaptive
     open System.Net
@@ -24,9 +24,19 @@ module rec Show =
     open Suave.SuaveConfig
     open Suave.WebPart
 
-    let inline toHTMLAux (a : ^a) (b : ^b) =
-        System.Console.SetOut System.IO.TextWriter.Null
-        ((^a or ^b) : (static member ToHTML : ^b -> string) (b))
+    let inline noOut (action : unit -> 'a) : 'a =
+        let o = System.Console.Out
+        try
+            System.Console.SetOut System.IO.TextWriter.Null
+            action()
+        finally
+            System.Console.SetOut o
+
+    let inline private toHTMLAux (a : ^a) (b : ^b) =
+        noOut <| fun () -> ((^a or ^b) : (static member ToHTML : ^b -> string) (b))
+        
+    let inline private showAux (a : ^a) (b : ^b) =
+        noOut <| fun () -> ((^a or ^b) : (static member Show : ^b -> ^c) (b))
 
     module Server =
         
@@ -51,19 +61,28 @@ module rec Show =
 
         do
             let stop, start = 
-                startWebServerAsync { defaultConfig with bindings = [ { scheme = Protocol.HTTP; socketBinding = { ip = IPAddress.Any; port = uint16 port } } ] } (fun r ->
-                    let parts = r.request.path.Split('/', StringSplitOptions.RemoveEmptyEntries)
-                    if parts.Length > 0 then 
-                        let entry = parts.[0]
-                        let newPath = parts |> Seq.skip 1 |> String.concat "/" |> sprintf "/%s"
-                        let r1 = { r with request = { r.request with rawPath = newPath } }
-                        match served.TryGetValue entry with
-                        | (true, e) -> e r1
-                        | _ -> Successful.OK entry r1
-                    else
-                        Successful.OK "HELLO" r
-                )
-            Async.StartImmediate start
+                noOut <| fun () -> 
+                    startWebServerAsync { defaultConfig with bindings = [ { scheme = Protocol.HTTP; socketBinding = { ip = IPAddress.Any; port = uint16 port } } ] } (fun r ->
+                        let parts = r.request.path.Split('/', StringSplitOptions.RemoveEmptyEntries)
+                        if parts.Length > 0 then 
+                            let entry = parts.[0]
+                            let newPath = parts |> Seq.skip 1 |> String.concat "/" |> sprintf "/%s"
+                            let r1 = { r with request = { r.request with rawPath = newPath } }
+                            match served.TryGetValue entry with
+                            | (true, e) -> e r1
+                            | _ -> Successful.OK entry r1
+                        else
+                            Successful.OK "HELLO" r
+                    )
+
+            async {
+                let o = System.Console.Out
+                try
+                    System.Console.SetOut System.IO.TextWriter.Null
+                    do! start
+                finally
+                    System.Console.SetOut o
+            } |> Async.StartImmediate
 
         let serve (attributes : list<string * AttributeValue<_>>) (part : WebPart) =
             let name = System.Guid.NewGuid() |> string
@@ -81,9 +100,16 @@ module rec Show =
             served.[name] <- part
             $"<iframe src=\"http://localhost:{port}/{name}/\" {atts}></iframe>"
 
-    type Shower private() =
 
-        static let app = lazy (new OpenGlApplication())
+
+    type Show private() =
+
+        static do 
+            noOut <| fun () ->
+                IntrospectionProperties.CustomEntryAssembly <- typeof<ISg<_>>.Assembly
+                Aardvark.Init()
+
+        static let app = lazy (noOut <| fun () -> new OpenGlApplication())
 
         static member ToHTML (dom : DomNode<_>) =
             let runtime = app.Value.Runtime
@@ -101,36 +127,10 @@ module rec Show =
                 }
             let mapp = App.start app
 
-            Server.serve [] (
-                MutableApp.toWebPart' runtime false mapp
-            )
-            
-
-        static member ToHTML (sg : ISg<_>) =
-            let runtime = app.Value.Runtime
-            let app =   
-                {
-                    initial = FreeFlyController.initial
-                    update = FreeFlyController.update
-                    view = fun m ->
-                        let atts =
-                            AttributeMap.ofList [
-                                style "background-color: #37373D"
-                                attribute "data-quality" "100"
-                                attribute "data-samples" "8"
-                            ]
-                        FreeFlyController.controlledControl m id (Frustum.perspective 60.0 0.1 100.0 1.0 |> AVal.constant) atts sg
-                    threads = FreeFlyController.threads
-                    unpersist = Unpersist.instance
-                }
-
-            let mapp = App.start app
-
-            Server.serve [style "width: 720px; height: 405px"] (
-                MutableApp.toWebPart' runtime false mapp
-            )
-                
-            //$"<iframe src=\"{url}\" style='width: 720px; height: 405px'></iframe>"
+            noOut <| fun () -> 
+                Server.serve [] (
+                    MutableApp.toWebPart' runtime false mapp
+                )
 
         static member ToHTML (img : PixImage) =
             use ms = new System.IO.MemoryStream()
@@ -185,14 +185,13 @@ module rec Show =
             $"<code>V2d({vec.X}, {vec.Y})</code>"
 
         static member inline ToHTML (mat : option<'a>) =
-            Shower.OptionToHTML(mat, toHTMLAux Unchecked.defaultof<Shower>)
+            Show.OptionToHTML(mat, toHTMLAux Unchecked.defaultof<Show>)
 
         static member inline ToHTML (mat : IMatrix<'a>) =
-            Shower.MatrixToHTML(mat, toHTMLAux Unchecked.defaultof<Shower>)
+            Show.MatrixToHTML(mat, toHTMLAux Unchecked.defaultof<Show>)
 
         static member inline ToHTML (mat : IVector<'a>) =
-            Shower.VectorToHTML(mat, toHTMLAux Unchecked.defaultof<Shower>)
-
+            Show.VectorToHTML(mat, toHTMLAux Unchecked.defaultof<Show>)
 
         static member ToHTML(sg : ISg<_>, ?width: int, ?height: int, ?samples: int) =
             let samples = defaultArg samples 8
@@ -218,19 +217,28 @@ module rec Show =
 
             let mapp = App.start app
 
-            Server.serve [style $"width: {width}px; height: {height}px"] (
-                MutableApp.toWebPart' runtime false mapp
+            noOut <| fun () -> 
+                Server.serve [style $"width: {width}px; height: {height}px"] (
+                    MutableApp.toWebPart' runtime false mapp
+                )
+
+
+    [<AutoOpen; AbstractClass; Sealed>]
+    type ShowHelpers =
+        static member show(sg : ISg<_>, ?width: int, ?height: int, ?samples: int) =
+            let html = Show.ToHTML(sg, ?width = width, ?height = height, ?samples = samples)
+            Kernel.display (
+                Kernel.HTML html
             )
 
+        static member inline show a =
+            let html = toHTMLAux Unchecked.defaultof<Show> a
+            Kernel.display (
+                Kernel.HTML html
+            )
 
-        //static member Show(sg : ISg<_>, ?width: int, ?height: int, ?samples: int)
+            
 
-
-    let inline toHTML a = toHTMLAux Unchecked.defaultof<Shower> a
-
-    let inline show a = 
-        Kernel.display (
-            Kernel.HTML(toHTML a)
-        )
+    let inline toHTML a = toHTMLAux Unchecked.defaultof<Show> a
 
     let markdown (a : string) = Kernel.display(a, "text/markdown")

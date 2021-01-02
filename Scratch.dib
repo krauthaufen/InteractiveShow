@@ -24,10 +24,6 @@ open FSharp.Data.Adaptive
 open Aardvark.Base.Rendering
 open Aardvark.DotNet.Interactive
 
-System.Console.SetOut System.IO.TextWriter.Null
-IntrospectionProperties.CustomEntryAssembly <- typeof<ISg<_>>.Assembly
-Aardvark.Init()
-
 #!fsharp
 
 let img =
@@ -66,7 +62,9 @@ show (
         do! DefaultSurfaces.diffuseTexture
         do! DefaultSurfaces.simpleLighting
     }    
-    |> Sg.noEvents
+    |> Sg.noEvents,
+    width = 1024,
+    height = 768
 )
 
 show (
@@ -76,7 +74,9 @@ show (
         do! DefaultSurfaces.trafo
         do! DefaultSurfaces.simpleLighting
     }    
-    |> Sg.noEvents
+    |> Sg.noEvents,
+    width = 1024,
+    height = 768
 )
 
 show (
@@ -85,5 +85,4 @@ show (
         button [ onClick (fun () -> ()) ] [ text "asdsad" ]
 
     ]
-
 )
